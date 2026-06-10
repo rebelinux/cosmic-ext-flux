@@ -10,7 +10,7 @@ use cosmic::prelude::*;
 use cosmic::widget;
 use futures_util::SinkExt;
 
-const APP_ID: &str = "com.system76.CosmicAppletFlux";
+const APP_ID: &str = "io.github.franz_net.CosmicExtAppletFlux";
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -107,9 +107,9 @@ impl cosmic::Application for AppModel {
     // Panel icon — changes based on playback state
     fn view(&self) -> Element<'_, Message> {
         let icon_name = if self.daemon_playing {
-            "com.system76.CosmicAppletFlux"
+            "io.github.franz_net.CosmicExtAppletFlux"
         } else {
-            "com.system76.CosmicAppletFlux-stopped"
+            "io.github.franz_net.CosmicExtAppletFlux-stopped"
         };
         self.core
             .applet
@@ -310,7 +310,7 @@ impl cosmic::Application for AppModel {
                 return Task::perform(
                     async {
                         tokio::process::Command::new("systemctl")
-                            .args(["--user", "start", "cosmic-flux-daemon"])
+                            .args(["--user", "start", "cosmic-ext-flux-daemon"])
                             .output()
                             .await
                             .ok();

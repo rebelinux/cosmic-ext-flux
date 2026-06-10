@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Cosmic Flux
-Comment=Control the Cosmic Flux live wallpaper
-Icon=com.system76.CosmicAppletFlux
-Exec=cosmic-applet-flux %F
+Name=Flux
+Comment=Control the Flux live wallpaper
+Icon=io.github.franz_net.CosmicExtAppletFlux
+Exec=cosmic-ext-applet-flux %F
 Terminal=false
 StartupNotify=true
 NoDisplay=true

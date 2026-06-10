@@ -1,4 +1,13 @@
-cosmic-flux (0.1.0-1) unstable; urgency=medium
+cosmic-ext-flux (2.0.0-1) unstable; urgency=medium
+
+  * Rename project to cosmic-ext-flux per the COSMIC trademark policy.
+  * New App ID and D-Bus name: io.github.franz_net.* (was com.system76.*).
+  * Migrate user config and frame cache from the old App ID automatically.
+  * Conflicts/Replaces/Provides cosmic-flux for a clean upgrade path.
+
+ -- Franz <cosmic-flux-info@franz-net.dev>  Tue, 09 Jun 2026 12:00:00 +0000
+
+cosmic-ext-flux (0.1.0-1) unstable; urgency=medium
 
   * Initial release.
 

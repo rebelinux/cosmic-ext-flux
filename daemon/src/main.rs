@@ -5,7 +5,7 @@ mod decoder;
 mod wayland;
 
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::AtomicBool,
     Arc, Mutex,
@@ -18,7 +18,7 @@ fn main() -> Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
-    tracing::info!("Starting cosmic-flux-daemon");
+    tracing::info!("Starting cosmic-ext-flux-daemon");
 
     // Initialize GStreamer once for the entire process
     gstreamer::init()?;
@@ -53,6 +53,9 @@ fn main() -> Result<()> {
         rt.block_on(dbus::serve(dbus_state, dbus_tx))
             .expect("D-Bus server error");
     });
+
+    // One-time migration from the pre-rename App ID / cache dirs
+    migrate_legacy_dirs();
 
     // Auto-restore: read applet config and queue commands if autostart is enabled
     restore_from_config(&command_tx);
@@ -114,18 +117,70 @@ fn restore_from_config(tx: &std::sync::mpsc::SyncSender<Command>) {
     let _ = tx.send(Command::SetSource(source));
 }
 
-/// cosmic-config stores each field as a separate RON file under
-/// ~/.config/cosmic/<APP_ID>/v<VERSION>/<field_name>
-fn dirs_config_path() -> Option<PathBuf> {
-    let config_home = std::env::var("XDG_CONFIG_HOME")
+/// One-time migration from the pre-rename identifiers: the applet config under
+/// `com.system76.CosmicAppletFlux` and the frame cache under `cosmic-flux`.
+/// Copies (never deletes) and only when the new location doesn't exist yet.
+fn migrate_legacy_dirs() {
+    let config_home = config_home();
+    migrate_dir(
+        &config_home.join("cosmic/com.system76.CosmicAppletFlux"),
+        &config_home.join("cosmic/io.github.franz_net.CosmicExtAppletFlux"),
+    );
+
+    let cache_home = std::env::var("XDG_CACHE_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_default();
+            PathBuf::from(home).join(".cache")
+        });
+    migrate_dir(
+        &cache_home.join("cosmic-flux"),
+        &cache_home.join("cosmic-ext-flux"),
+    );
+}
+
+fn migrate_dir(old: &Path, new: &Path) {
+    if !old.is_dir() || new.exists() {
+        return;
+    }
+    match copy_dir_recursive(old, new) {
+        Ok(()) => tracing::info!("Migrated {} -> {}", old.display(), new.display()),
+        Err(e) => tracing::warn!("Failed to migrate {}: {e}", old.display()),
+    }
+}
+
+/// Recursive copy of regular files and directories; symlinks are skipped.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let to = dst.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive(&entry.path(), &to)?;
+        } else if file_type.is_file() {
+            std::fs::copy(entry.path(), &to)?;
+        }
+    }
+    Ok(())
+}
+
+fn config_home() -> PathBuf {
+    std::env::var("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
             let home = std::env::var("HOME").unwrap_or_default();
             PathBuf::from(home).join(".config")
-        });
+        })
+}
+
+/// cosmic-config stores each field as a separate RON file under
+/// ~/.config/cosmic/<APP_ID>/v<VERSION>/<field_name>
+fn dirs_config_path() -> Option<PathBuf> {
+    let config_home = config_home();
     // Try newest version first, fall back to older
     for ver in ["v3", "v2", "v1"] {
-        let dir = config_home.join(format!("cosmic/com.system76.CosmicAppletFlux/{ver}"));
+        let dir = config_home.join(format!("cosmic/io.github.franz_net.CosmicExtAppletFlux/{ver}"));
         if dir.is_dir() {
             return Some(dir);
         }

@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: cosmic-flux
+Upstream-Name: cosmic-ext-flux
 Upstream-Contact: Franz <cosmic-flux-info@franz-net.dev>
-Source: https://github.com/franz-net/cosmic-flux
+Source: https://github.com/franz-net/cosmic-ext-flux
 
 Files: *
 Copyright: 2026 Franz Ramirez

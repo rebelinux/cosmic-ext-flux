@@ -1,12 +1,12 @@
 [package]
-name = "cosmic-flux-daemon"
+name = "cosmic-ext-flux-daemon"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Wayland layer-shell daemon that renders GIF/video to the desktop background"
 
 [[bin]]
-name = "cosmic-flux-daemon"
+name = "cosmic-ext-flux-daemon"
 path = "src/main.rs"
 
 [dependencies]

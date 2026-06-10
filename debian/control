@@ -1,4 +1,4 @@
-Source: cosmic-flux
+Source: cosmic-ext-flux
 Section: x11
 Priority: optional
 Maintainer: Franz <cosmic-flux-info@franz-net.dev>
@@ -11,9 +11,9 @@ Build-Depends: debhelper-compat (= 13),
                libwayland-dev,
                just
 Standards-Version: 4.6.2
-Homepage: https://www.franz-e.net/cosmic-flux/
+Homepage: https://www.franz-e.net/cosmic-ext-flux/
 
-Package: cosmic-flux
+Package: cosmic-ext-flux
 Architecture: amd64
 Depends: ${shlibs:Depends},
          ${misc:Depends},
@@ -21,8 +21,11 @@ Depends: ${shlibs:Depends},
          gstreamer1.0-plugins-good,
          gstreamer1.0-plugins-bad
 Recommends: gstreamer1.0-vaapi
+Conflicts: cosmic-flux
+Replaces: cosmic-flux
+Provides: cosmic-flux
 Description: Live wallpaper daemon and applet for COSMIC desktop
- Cosmic Flux renders GIF and video files as live wallpapers on the
- COSMIC desktop. It includes a Wayland layer-shell daemon (cosmic-flux-daemon)
- and a COSMIC panel applet (cosmic-applet-flux) for controlling playback,
+ Flux renders GIF and video files as live wallpapers on the
+ COSMIC desktop. It includes a Wayland layer-shell daemon (cosmic-ext-flux-daemon)
+ and a COSMIC panel applet (cosmic-ext-applet-flux) for controlling playback,
  fit mode, FPS cap, and multi-monitor span mode.

@@ -7,18 +7,18 @@ override_dh_auto_build:
 	cargo build --release
 
 override_dh_auto_install:
-	install -Dm755 target/release/cosmic-flux-daemon \
-		debian/cosmic-flux/usr/bin/cosmic-flux-daemon
-	install -Dm755 target/release/cosmic-applet-flux \
-		debian/cosmic-flux/usr/bin/cosmic-applet-flux
+	install -Dm755 target/release/cosmic-ext-flux-daemon \
+		debian/cosmic-ext-flux/usr/bin/cosmic-ext-flux-daemon
+	install -Dm755 target/release/cosmic-ext-applet-flux \
+		debian/cosmic-ext-flux/usr/bin/cosmic-ext-applet-flux
 	install -Dm644 applet/resources/app.desktop \
-		debian/cosmic-flux/usr/share/applications/com.system76.CosmicAppletFlux.desktop
+		debian/cosmic-ext-flux/usr/share/applications/io.github.franz_net.CosmicExtAppletFlux.desktop
 	install -Dm644 applet/resources/icon.svg \
-		debian/cosmic-flux/usr/share/icons/hicolor/scalable/apps/com.system76.CosmicAppletFlux.svg
+		debian/cosmic-ext-flux/usr/share/icons/hicolor/scalable/apps/io.github.franz_net.CosmicExtAppletFlux.svg
 	install -Dm644 applet/resources/icon-stopped.svg \
-		debian/cosmic-flux/usr/share/icons/hicolor/scalable/apps/com.system76.CosmicAppletFlux-stopped.svg
-	install -Dm644 data/cosmic-flux-daemon.service \
-		debian/cosmic-flux/usr/lib/systemd/user/cosmic-flux-daemon.service
+		debian/cosmic-ext-flux/usr/share/icons/hicolor/scalable/apps/io.github.franz_net.CosmicExtAppletFlux-stopped.svg
+	install -Dm644 data/cosmic-ext-flux-daemon.service \
+		debian/cosmic-ext-flux/usr/lib/systemd/user/cosmic-ext-flux-daemon.service
 
 override_dh_auto_test:
 	# Tests require a running Wayland compositor

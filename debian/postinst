@@ -5,7 +5,7 @@ case "$1" in
     configure)
         # Warn if COSMIC desktop is not detected
         if [ -n "$XDG_CURRENT_DESKTOP" ] && ! echo "$XDG_CURRENT_DESKTOP" | grep -qi "cosmic"; then
-            echo "WARNING: Cosmic Flux requires the COSMIC desktop environment."
+            echo "WARNING: Flux requires the COSMIC desktop environment."
             echo "The current desktop is: $XDG_CURRENT_DESKTOP"
             echo "The package has been installed but will not function without COSMIC."
         fi
@@ -18,9 +18,12 @@ case "$1" in
             systemctl --global daemon-reload || true
             # If running as a logged-in user (not during image build), enable the service
             if [ -n "$SUDO_USER" ]; then
-                su - "$SUDO_USER" -c "systemctl --user enable --now cosmic-flux-daemon" || true
+                # Clean up the pre-rename service if it lingers, then enable the new one
+                su - "$SUDO_USER" -c "systemctl --user disable --now cosmic-flux-daemon 2>/dev/null" || true
+                su - "$SUDO_USER" -c "systemctl --user enable --now cosmic-ext-flux-daemon" || true
             elif [ -n "$USER" ] && [ "$USER" != "root" ]; then
-                systemctl --user enable --now cosmic-flux-daemon || true
+                systemctl --user disable --now cosmic-flux-daemon 2>/dev/null || true
+                systemctl --user enable --now cosmic-ext-flux-daemon || true
             fi
         fi
         ;;
