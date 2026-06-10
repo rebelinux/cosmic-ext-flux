@@ -1131,7 +1131,7 @@ fn dirs_cache_path() -> Option<std::path::PathBuf> {
             let home = std::env::var("HOME").unwrap_or_default();
             std::path::PathBuf::from(home).join(".cache")
         });
-    Some(cache_home.join("cosmic-flux"))
+    Some(cache_home.join("cosmic-ext-flux"))
 }
 
 fn resize_pool_for(os: &mut OutputSurface) {
@@ -1254,7 +1254,7 @@ impl OutputHandler for WallpaperRenderer {
             qh,
             surface,
             Layer::Background,
-            Some("cosmic-flux"),
+            Some("cosmic-ext-flux"),
             Some(&output),
         );
         layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);

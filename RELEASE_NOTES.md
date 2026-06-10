@@ -4,32 +4,28 @@
 ## Highlights
 
 <!-- Replace with the key changes for this release -->
-- First release of Cosmic Flux — a live wallpaper system for the COSMIC desktop
-- Play video (MP4, WebM, MKV) and GIF files as your desktop wallpaper
-- Hardware-accelerated decoding via VA-API (Intel/AMD)
-- Display modes: zoom, fit, stretch
-- Multi-monitor support with mirror and span modes
-- Cross-fade transitions when switching wallpapers
-- Tuneable FPS cap (5–60 fps) via panel applet
-- Performance stats (CPU%, RAM, FPS) in applet popup
-- Auto-restore wallpaper on daemon restart
-- Systemd user service with auto-enable on install
-- Start daemon button in applet when service is not running
+- **Project renamed to comply with the [COSMIC trademark policy](https://github.com/pop-os/cosmic-epoch/blob/master/TRADEMARK.md)** (#5):
+  - Package: `cosmic-flux` → `cosmic-ext-flux`
+  - Binaries: `cosmic-ext-flux-daemon`, `cosmic-ext-applet-flux`
+  - App ID / D-Bus: `com.system76.*` → `io.github.franz_net.*`
+  - Display name: **Flux** — live video wallpapers for the COSMIC™ desktop
+- Installing this package automatically removes the old `cosmic-flux` package and its systemd service
+- Existing settings are migrated automatically on first start — no reconfiguration needed
 
 ## Install
 
 ```sh
 sudo apt-get install -y gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-vaapi
-sudo dpkg -i cosmic-flux_<version>_amd64.deb
+sudo dpkg -i cosmic-ext-flux_<version>_amd64.deb
 ```
 
-Add the **Cosmic Flux** applet to your panel via Settings > Desktop > Panel > Applets.
+Add the **Flux** applet to your panel via Settings > Desktop > Panel > Applets.
 
 ## Uninstall
 
 ```sh
-systemctl --user disable --now cosmic-flux-daemon
-sudo dpkg -r cosmic-flux
+systemctl --user disable --now cosmic-ext-flux-daemon
+sudo dpkg -r cosmic-ext-flux
 ```
 
 ## Requirements

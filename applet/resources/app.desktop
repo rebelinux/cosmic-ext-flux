@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=Cosmic Flux
-Comment=Control the Cosmic Flux live wallpaper
-Comment[fr]=Contrôle du fond d'écran animé Cosmic Flux
-Icon=dev.franz_net.CosmicAppletFlux
-Exec=cosmic-applet-flux %F
+Name=Flux
+Comment=Control the Flux live wallpaper
+Comment[fr]=Contrôle du fond d'écran animé Flux
+Icon=io.github.franz_net.CosmicExtAppletFlux
+Exec=cosmic-ext-applet-flux %F
 Terminal=false
 StartupNotify=true
 NoDisplay=true

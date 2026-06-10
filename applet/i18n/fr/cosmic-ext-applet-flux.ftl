@@ -1,4 +1,4 @@
-app-title = Cosmic Flux
+app-title = Flux
 source-file = Fichier de fond d'écran
 no-file-selected = Aucun fichier sélectionné
 playback = Lecture

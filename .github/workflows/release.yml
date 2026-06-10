@@ -49,7 +49,7 @@ jobs:
 
       - name: Build .deb package
         run: |
-          PKG_NAME="cosmic-flux"
+          PKG_NAME="cosmic-ext-flux"
           VERSION="${{ steps.version.outputs.VERSION }}"
           ARCH="amd64"
           DEB_DIR="${PKG_NAME}_${VERSION}_${ARCH}"
@@ -69,10 +69,13 @@ jobs:
           Architecture: ${ARCH}
           Depends: gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad
           Recommends: gstreamer1.0-vaapi
+          Conflicts: cosmic-flux
+          Replaces: cosmic-flux
+          Provides: cosmic-flux
           Maintainer: Franz <cosmic-flux-info@franz-net.dev>
-          Homepage: https://www.franz-e.net/cosmic-flux/
+          Homepage: https://www.franz-e.net/cosmic-ext-flux/
           Description: Live wallpaper daemon and applet for COSMIC desktop
-           Cosmic Flux renders GIF and video files as live wallpapers on the
+           Flux renders GIF and video files as live wallpapers on the
            COSMIC desktop. Includes a Wayland layer-shell daemon and a COSMIC
            panel applet for controlling playback, fit mode, FPS cap, and
            multi-monitor span mode.
@@ -82,15 +85,15 @@ jobs:
           sed -i 's/^          //' "${DEB_DIR}/DEBIAN/control"
 
           # Install files
-          install -m755 target/release/cosmic-flux-daemon "${DEB_DIR}/usr/bin/"
-          install -m755 target/release/cosmic-applet-flux "${DEB_DIR}/usr/bin/"
+          install -m755 target/release/cosmic-ext-flux-daemon "${DEB_DIR}/usr/bin/"
+          install -m755 target/release/cosmic-ext-applet-flux "${DEB_DIR}/usr/bin/"
           install -m644 applet/resources/app.desktop \
-            "${DEB_DIR}/usr/share/applications/com.system76.CosmicAppletFlux.desktop"
+            "${DEB_DIR}/usr/share/applications/io.github.franz_net.CosmicExtAppletFlux.desktop"
           install -m644 applet/resources/icon.svg \
-            "${DEB_DIR}/usr/share/icons/hicolor/scalable/apps/com.system76.CosmicAppletFlux.svg"
+            "${DEB_DIR}/usr/share/icons/hicolor/scalable/apps/io.github.franz_net.CosmicExtAppletFlux.svg"
           install -m644 applet/resources/icon-stopped.svg \
-            "${DEB_DIR}/usr/share/icons/hicolor/scalable/apps/com.system76.CosmicAppletFlux-stopped.svg"
-          install -m644 data/cosmic-flux-daemon.service \
+            "${DEB_DIR}/usr/share/icons/hicolor/scalable/apps/io.github.franz_net.CosmicExtAppletFlux-stopped.svg"
+          install -m644 data/cosmic-ext-flux-daemon.service \
             "${DEB_DIR}/usr/lib/systemd/user/"
 
           # Post-install script (COSMIC check + icon cache + systemd reload)
@@ -102,6 +105,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: cosmic-flux_*.deb
+          files: cosmic-ext-flux_*.deb
           generate_release_notes: true
           body_path: RELEASE_NOTES.md

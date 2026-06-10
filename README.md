@@ -1,23 +1,25 @@
 <p align="center">
-  <img src="assets/logo.svg" width="128" alt="Cosmic Flux logo">
+  <img src="assets/logo.svg" width="128" alt="Flux logo">
 </p>
 
-# Cosmic Flux
+# Flux
 
-Cosmic Flux turns your [COSMIC](https://github.com/pop-os/cosmic-epoch) desktop background into a living canvas. Drop in any video (MP4, WebM, MKV) or GIF and watch it play seamlessly behind your windows. Hardware-accelerated decoding keeps CPU usage low, while the panel applet gives you instant access to playback controls, display modes, FPS tuning, and multi-monitor settings — all without leaving your workflow.
+*Live video wallpapers for the [COSMIC™](https://github.com/pop-os/cosmic-epoch) desktop.*
+
+Flux turns your COSMIC™ desktop background into a living canvas. Drop in any video (MP4, WebM, MKV) or GIF and watch it play seamlessly behind your windows. Hardware-accelerated decoding keeps CPU usage low, while the panel applet gives you instant access to playback controls, display modes, FPS tuning, and multi-monitor settings — all without leaving your workflow.
 
 <p align="center">
-  <img src="assets/screenshot.png" width="800" alt="Cosmic Flux applet with live wallpaper">
+  <img src="assets/screenshot.png" width="800" alt="Flux applet with live wallpaper">
 </p>
 
 ## Components
 
 | Component | Description |
 |-----------|------------|
-| **Daemon** (`cosmic-flux-daemon`) | Wayland layer-shell service that decodes video via GStreamer and renders frames to the desktop background |
-| **Applet** (`cosmic-applet-flux`) | COSMIC panel applet for selecting files, controlling playback, and adjusting settings |
+| **Daemon** (`cosmic-ext-flux-daemon`) | Wayland layer-shell service that decodes video via GStreamer and renders frames to the desktop background |
+| **Applet** (`cosmic-ext-applet-flux`) | COSMIC panel applet for selecting files, controlling playback, and adjusting settings |
 
-The daemon and applet communicate over D-Bus (`com.system76.CosmicFlux1`).
+The daemon and applet communicate over D-Bus (`io.github.franz_net.CosmicExtFlux1`).
 
 ## Features
 
@@ -35,32 +37,32 @@ The daemon and applet communicate over D-Bus (`com.system76.CosmicFlux1`).
 
 ## Install (Pre-built Package)
 
-Download the latest `.deb` from [Releases](https://github.com/franz-net/cosmic-flux/releases).
+Download the latest `.deb` from [Releases](https://github.com/franz-net/cosmic-ext-flux/releases).
 
 ```sh
 # Download the latest release
-wget https://github.com/franz-net/cosmic-flux/releases/download/v0.1.0/cosmic-flux_0.1.0_amd64.deb
+wget https://github.com/franz-net/cosmic-ext-flux/releases/download/v0.1.0/cosmic-ext-flux_0.1.0_amd64.deb
 
 # Install (automatically pulls dependencies)
-sudo apt install ./cosmic-flux_0.1.0_amd64.deb
+sudo apt install ./cosmic-ext-flux_0.1.0_amd64.deb
 ```
 
-The daemon is automatically enabled and started on install. Add the **Cosmic Flux** applet to your COSMIC panel via Settings > Desktop > Panel > Applets.
+The daemon is automatically enabled and started on install. Add the **Flux** applet to your COSMIC panel via Settings > Desktop > Panel > Applets.
 
 ### Uninstall
 
 ```sh
 # Stop and disable the daemon
-systemctl --user disable --now cosmic-flux-daemon
+systemctl --user disable --now cosmic-ext-flux-daemon
 
 # Remove the package
-sudo dpkg -r cosmic-flux
+sudo dpkg -r cosmic-ext-flux
 ```
 
 User configuration in `~/.config/cosmic/` is preserved after uninstall. To remove it as well:
 
 ```sh
-rm -rf ~/.config/cosmic/com.system76.CosmicAppletFlux/
+rm -rf ~/.config/cosmic/io.github.franz_net.CosmicExtAppletFlux/
 ```
 
 ## Build from Source
@@ -104,12 +106,12 @@ just build-release
 just install
 
 # Enable the daemon to start with your session
-systemctl --user enable --now cosmic-flux-daemon
+systemctl --user enable --now cosmic-ext-flux-daemon
 ```
 
 ## Usage
 
-1. Add the **Cosmic Flux** applet to your COSMIC panel
+1. Add the **Flux** applet to your COSMIC panel
 2. Click the applet icon to open the popup
 3. Select a video or GIF file
 4. Adjust display mode, FPS cap, and span settings as desired
@@ -159,8 +161,8 @@ Applet ◄───────────────────────�
 
 ## D-Bus Interface
 
-Service: `com.system76.CosmicFlux1`
-Path: `/com/system76/CosmicFlux`
+Service: `io.github.franz_net.CosmicExtFlux1`
+Path: `/io/github/franz_net/CosmicExtFlux`
 
 ### Methods
 
@@ -184,13 +186,13 @@ Path: `/com/system76/CosmicFlux`
 ### Check daemon status
 
 ```sh
-systemctl --user status cosmic-flux-daemon
+systemctl --user status cosmic-ext-flux-daemon
 ```
 
 ### View daemon logs
 
 ```sh
-journalctl --user -u cosmic-flux-daemon -f
+journalctl --user -u cosmic-ext-flux-daemon -f
 ```
 
 The `-f` flag follows new output in real time. Remove it to see the full log history.
@@ -198,26 +200,26 @@ The `-f` flag follows new output in real time. Remove it to see the full log his
 ### Restart the daemon
 
 ```sh
-systemctl --user restart cosmic-flux-daemon
+systemctl --user restart cosmic-ext-flux-daemon
 ```
 
 ### Common issues
 
 | Problem | Solution |
 |---------|----------|
-| Wallpaper not showing | Check that the daemon is running: `systemctl --user status cosmic-flux-daemon` |
-| Applet says "Daemon not running" | Click the **Start** button in the applet, or run `systemctl --user start cosmic-flux-daemon` |
+| Wallpaper not showing | Check that the daemon is running: `systemctl --user status cosmic-ext-flux-daemon` |
+| Applet says "Daemon not running" | Click the **Start** button in the applet, or run `systemctl --user start cosmic-ext-flux-daemon` |
 | Video plays but is black/corrupt | Try a different video file. Ensure GStreamer plugins are installed: `apt list --installed \| grep gstreamer` |
 | High CPU usage | Lower the FPS cap in the applet. Use H.264 videos for hardware decode. Check VA-API: `vainfo` |
 | No hardware decode | Install VA-API drivers: `sudo apt install gstreamer1.0-vaapi intel-media-va-driver` (Intel) or `mesa-va-drivers` (AMD) |
-| Wallpaper doesn't restore on login | Ensure the daemon service is enabled: `systemctl --user enable cosmic-flux-daemon` |
-| Applet not visible in panel settings | Verify the desktop entry is installed: `ls /usr/share/applications/com.system76.CosmicAppletFlux.desktop` |
+| Wallpaper doesn't restore on login | Ensure the daemon service is enabled: `systemctl --user enable cosmic-ext-flux-daemon` |
+| Applet not visible in panel settings | Verify the desktop entry is installed: `ls /usr/share/applications/io.github.franz_net.CosmicExtAppletFlux.desktop` |
 
 ### Reset configuration
 
 ```sh
-rm -rf ~/.config/cosmic/com.system76.CosmicAppletFlux/
-systemctl --user restart cosmic-flux-daemon
+rm -rf ~/.config/cosmic/io.github.franz_net.CosmicExtAppletFlux/
+systemctl --user restart cosmic-ext-flux-daemon
 ```
 
 ### Debug logging
@@ -225,8 +227,8 @@ systemctl --user restart cosmic-flux-daemon
 Run the daemon manually with verbose output:
 
 ```sh
-systemctl --user stop cosmic-flux-daemon
-RUST_LOG=debug cosmic-flux-daemon
+systemctl --user stop cosmic-ext-flux-daemon
+RUST_LOG=debug cosmic-ext-flux-daemon
 ```
 
 ## Development
@@ -245,3 +247,7 @@ just check
 ## License
 
 GPL-3.0-only
+
+## Trademark Notice
+
+COSMIC™ is a trademark of System76, Inc. Flux (`cosmic-ext-flux`) is an independent, third-party project for the COSMIC™ desktop and is not affiliated with, endorsed by, or sponsored by System76. See the [COSMIC trademark policy](https://github.com/pop-os/cosmic-epoch/blob/master/TRADEMARK.md).

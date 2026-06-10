@@ -8,9 +8,9 @@ use tokio::sync::Mutex;
 use zbus::proxy;
 
 #[proxy(
-    interface = "com.system76.CosmicFlux1",
-    default_service = "com.system76.CosmicFlux1",
-    default_path = "/com/system76/CosmicFlux"
+    interface = "io.github.franz_net.CosmicExtFlux1",
+    default_service = "io.github.franz_net.CosmicExtFlux1",
+    default_path = "/io/github/franz_net/CosmicExtFlux"
 )]
 pub trait WallpaperDaemon {
     async fn set_source(&self, path: &str) -> zbus::Result<()>;

@@ -1,12 +1,12 @@
 [package]
-name = "cosmic-applet-flux"
+name = "cosmic-ext-applet-flux"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "COSMIC panel applet for controlling the Cosmic Flux wallpaper daemon"
+description = "COSMIC panel applet for controlling the Flux wallpaper daemon"
 
 [[bin]]
-name = "cosmic-applet-flux"
+name = "cosmic-ext-applet-flux"
 path = "src/main.rs"
 
 [dependencies]
