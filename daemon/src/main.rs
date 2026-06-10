@@ -35,7 +35,7 @@ fn main() -> Result<()> {
         cpu_percent: 0.0,
         memory_mb: 0.0,
         fps: 0.0,
-        fps_cap: 15,
+        fps_cap: 0,
         source_fps: 0.0,
     }));
 
@@ -107,7 +107,7 @@ fn restore_from_config(tx: &std::sync::mpsc::SyncSender<Command>) {
 
     let fit_mode = read_config_string(&config_dir, "fit_mode").unwrap_or_default();
     let span_mode = read_config_bool(&config_dir, "span_mode").unwrap_or(false);
-    let fps_cap = read_config_u32(&config_dir, "fps_cap").unwrap_or(15);
+    let fps_cap = read_config_u32(&config_dir, "fps_cap").unwrap_or(0);
 
     if !fit_mode.is_empty() {
         let _ = tx.send(Command::SetFitMode(wayland::FitMode::from_str(&fit_mode)));

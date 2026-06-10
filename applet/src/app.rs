@@ -24,6 +24,7 @@ pub enum Message {
     SetFitMode(String),
     SetSpanMode(bool),
     SetFpsCap(u32),
+    SetFpsAuto(bool),
     UpdateConfig(Config),
     DaemonState { playing: bool, error: Option<String>, cpu: f64, memory: f64, fps: f64, source_fps: f64 },
     CommandSent,
@@ -83,7 +84,7 @@ impl cosmic::Application for AppModel {
                 Err((_errors, config)) => config,
             })
             .unwrap_or_default();
-        config.fps_cap = config.fps_cap.clamp(5, 60);
+        config.fps_cap = normalize_fps_cap(config.fps_cap);
 
         let app = AppModel {
             core,
@@ -175,21 +176,35 @@ impl cosmic::Application for AppModel {
 
         content = content.add(fit_row);
 
-        // FPS cap slider with source info
-        let fps_label = if self.source_fps > 0.0 {
-            let recommended = ((self.source_fps / 3.0).round() as u32).clamp(5, 15);
-            format!("{} ({}) · src: {:.0}fps, rec: {}", fl!("fps-cap"), self.config.fps_cap, self.source_fps, recommended)
+        // Auto FPS toggle (fps_cap == 0 follows the source framerate)
+        let fps_auto = self.config.fps_cap == 0;
+        let auto_label = if fps_auto && self.source_fps > 0.0 {
+            format!("{} · src: {:.0}fps", fl!("fps-auto"), self.source_fps)
         } else {
-            format!("{} ({})", fl!("fps-cap"), self.config.fps_cap)
+            fl!("fps-auto")
         };
-        let fps_row = widget::settings::item(
-            fps_label,
-            widget::slider(5.0..=60.0, self.config.fps_cap as f64, |v| {
-                Message::SetFpsCap(v as u32)
-            })
-            .step(5.0),
-        );
-        content = content.add(fps_row);
+        content = content.add(widget::settings::item(
+            auto_label,
+            widget::toggler(fps_auto).on_toggle(Message::SetFpsAuto),
+        ));
+
+        // Manual FPS cap slider, shown only when auto is off
+        if !fps_auto {
+            let fps_label = if self.source_fps > 0.0 {
+                let recommended = ((self.source_fps / 3.0).round() as u32).clamp(5, 15);
+                format!("{} ({}) · src: {:.0}fps, rec: {}", fl!("fps-cap"), self.config.fps_cap, self.source_fps, recommended)
+            } else {
+                format!("{} ({})", fl!("fps-cap"), self.config.fps_cap)
+            };
+            let fps_row = widget::settings::item(
+                fps_label,
+                widget::slider(5.0..=60.0, self.config.fps_cap as f64, |v| {
+                    Message::SetFpsCap(v as u32)
+                })
+                .step(1.0),
+            );
+            content = content.add(fps_row);
+        }
 
         // Span mode toggle
         let span_row = widget::settings::item(
@@ -282,7 +297,7 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::UpdateConfig(mut config) => {
-                config.fps_cap = config.fps_cap.clamp(5, 60);
+                config.fps_cap = normalize_fps_cap(config.fps_cap);
                 self.config = config;
             }
             Message::DaemonState { playing, error, cpu, memory, fps, source_fps } => {
@@ -343,6 +358,13 @@ impl cosmic::Application for AppModel {
             }
             Message::Play => {
                 self.daemon_playing = true;
+                // Re-enable autostart so the wallpaper restores at next login.
+                // Stop clears it, but resuming via Play means the user wants
+                // the wallpaper back permanently (issue #2).
+                if !self.config.autostart && !self.config.source_path.is_empty() {
+                    self.config.autostart = true;
+                    self.save_config();
+                }
                 return Task::perform(send_command(DaemonCommand::Play), |_| {
                     cosmic::Action::App(Message::CommandSent)
                 });
@@ -386,6 +408,23 @@ impl cosmic::Application for AppModel {
                     |_| cosmic::Action::App(Message::CommandSent),
                 );
             }
+            Message::SetFpsAuto(enabled) => {
+                // Auto = 0 (follow source). Turning auto off seeds the slider
+                // with the source framerate when known.
+                let fps = if enabled {
+                    0
+                } else if self.source_fps > 0.0 {
+                    (self.source_fps.round() as u32).clamp(5, 60)
+                } else {
+                    15
+                };
+                self.config.fps_cap = fps;
+                self.save_config();
+                return Task::perform(
+                    send_command(DaemonCommand::SetFpsCap(fps)),
+                    |_| cosmic::Action::App(Message::CommandSent),
+                );
+            }
         }
         Task::none()
     }
@@ -402,6 +441,15 @@ impl AppModel {
                 tracing::error!("Failed to save config: {e:?}");
             }
         }
+    }
+}
+
+/// 0 means follow the source framerate; anything else is clamped to 5–60.
+fn normalize_fps_cap(fps: u32) -> u32 {
+    if fps == 0 {
+        0
+    } else {
+        fps.clamp(5, 60)
     }
 }
 

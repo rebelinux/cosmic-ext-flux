@@ -12,6 +12,7 @@ fit-fit = Ajuster (format 4/3)
 fit-stretch = Étirer
 span-mode = S'étendre sur deux écrans
 fps-cap = Limite d'images par seconde
+fps-auto = FPS auto (suivre la source)
 error = Erreur
 daemon-unavailable = Démon non exécuté
 start-daemon = Démarrer

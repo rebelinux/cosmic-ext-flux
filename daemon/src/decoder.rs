@@ -57,14 +57,16 @@ impl DecoderPipeline {
             .build()
             .map_err(|e| anyhow!("Failed to create videorate: {e}"))?;
 
-        // Cap fps in native format before color conversion
+        // Cap fps in native format before color conversion.
+        // fps_cap == 0 means follow the source framerate: leave the caps
+        // unconstrained so videorate (drop-only) passes frames through as-is.
+        let mut rate_caps_builder = gst::Caps::builder("video/x-raw");
+        if fps_cap > 0 {
+            rate_caps_builder =
+                rate_caps_builder.field("framerate", gst::Fraction::new(fps_cap as i32, 1));
+        }
         let rate_caps = gst::ElementFactory::make("capsfilter")
-            .property(
-                "caps",
-                &gst::Caps::builder("video/x-raw")
-                    .field("framerate", gst::Fraction::new(fps_cap.max(1) as i32, 1))
-                    .build(),
-            )
+            .property("caps", &rate_caps_builder.build())
             .build()
             .map_err(|e| anyhow!("Failed to create rate capsfilter: {e}"))?;
 
