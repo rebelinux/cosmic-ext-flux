@@ -87,9 +87,10 @@ impl WallpaperInterface {
     }
 
     async fn set_fps_cap(&self, fps: u32) -> zbus::fdo::Result<()> {
-        if !(5..=60).contains(&fps) {
+        // 0 = follow source framerate
+        if fps != 0 && !(5..=60).contains(&fps) {
             return Err(zbus::fdo::Error::InvalidArgs(
-                "FPS cap must be between 5 and 60".to_string(),
+                "FPS cap must be 0 (auto) or between 5 and 60".to_string(),
             ));
         }
         self.command_tx

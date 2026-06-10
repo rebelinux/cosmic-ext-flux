@@ -191,7 +191,7 @@ pub fn run(
         frames_drawn: 0,
         fps_last_update: std::time::Instant::now(),
         last_proc_stat: None,
-        fps_cap: 15,
+        fps_cap: 0, // 0 = follow source framerate
         fit_mode: FitMode::Zoom,
         blend_buffer: Vec::new(),
         scaled_prev_buffer: Vec::new(),
@@ -840,7 +840,8 @@ impl WallpaperRenderer {
                 self.draw_all_outputs(qh);
             }
             Command::SetFpsCap(fps) => {
-                let fps = fps.clamp(5, 60);
+                // 0 = follow source framerate
+                let fps = if fps == 0 { 0 } else { fps.clamp(5, 60) };
                 self.fps_cap = fps;
                 if let Ok(mut state) = self.daemon_state.lock() {
                     state.fps_cap = fps;

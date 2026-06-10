@@ -11,6 +11,9 @@
   - Display name: **Flux** — live video wallpapers for the COSMIC™ desktop
 - Installing this package automatically removes the old `cosmic-flux` package and its systemd service
 - Existing settings are migrated automatically on first start — no reconfiguration needed
+- **Auto FPS** (#4): new "Auto FPS (match source)" toggle plays the video at its native framerate — now the default for new installs; the manual slider remains as a power-saving cap and now adjusts in steps of 1 (so 24 fps is selectable)
+- **Fixed: wallpaper not restoring after login** (#2): pressing Play after a Stop now re-enables autostart, so the wallpaper comes back at the next login
+- French translation for the applet (thanks @ligenix!)
 
 ## Install
 

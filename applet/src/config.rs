@@ -20,7 +20,7 @@ impl Default for Config {
             fit_mode: String::new(),
             autostart: false,
             span_mode: false,
-            fps_cap: 15,
+            fps_cap: 0, // 0 = follow source framerate
         }
     }
 }
