@@ -90,9 +90,9 @@ impl cosmic::Application for AppModel {
             config,
             daemon_available: true,
             fit_options: vec![
-                String::from("Zoom (crop to fill)"),
-                String::from("Fit (letterbox)"),
-                String::from("Stretch"),
+                fl!("fit-zoom"),
+                fl!("fit-fit"),
+                fl!("fit-stretch"),
             ],
             ..Default::default()
         };

@@ -2,6 +2,7 @@
 Type=Application
 Name=Flux
 Comment=Control the Flux live wallpaper
+Comment[fr]=Contrôle du fond d'écran animé Flux
 Icon=io.github.franz_net.CosmicExtAppletFlux
 Exec=cosmic-ext-applet-flux %F
 Terminal=false
