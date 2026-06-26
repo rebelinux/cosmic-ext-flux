@@ -21,6 +21,12 @@ use smithay_client_toolkit::{
     },
     shm::{slot::SlotPool, Shm, ShmHandler},
 };
+use cosmic_client_toolkit::{
+    cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::State as ToplevelState,
+    delegate_toplevel_info,
+    toplevel_info::{ToplevelInfoHandler, ToplevelInfoState},
+    wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1,
+};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
@@ -67,6 +73,34 @@ pub enum Command {
     SetFitMode(FitMode),
     SetSpanMode(bool),
     SetFpsCap(u32),
+    SetPauseOnFullscreen(bool),
+    SetPauseOnMaximized(bool),
+}
+
+/// What the user last explicitly asked for. Distinct from the *effective*
+/// playback state, which also depends on auto-pause reasons below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UserIntent {
+    Playing,
+    Paused,
+    Stopped,
+}
+
+/// Reasons the daemon auto-pauses playback independently of the user's intent.
+/// Effective playback is "user wants to play AND no auto-pause reason is active".
+/// Issue #1 (pause-on-battery) will add an `on_battery` field here and feed it
+/// through the same `reconcile_playback` path.
+#[derive(Debug, Default, Clone, Copy)]
+struct AutoPause {
+    /// A fullscreen (or, if opted in, maximized) toplevel is covering the
+    /// screen (issue #13).
+    covered: bool,
+}
+
+impl AutoPause {
+    fn any(&self) -> bool {
+        self.covered
+    }
 }
 
 /// Shared readable state published by the daemon (read by D-Bus properties).
@@ -121,8 +155,19 @@ struct WallpaperRenderer {
     command_rx: std::sync::mpsc::Receiver<Command>,
 
     pipeline: Option<crate::decoder::DecoderPipeline>,
+    /// Effective playback state: pipeline is PLAYING and the frame-callback
+    /// chain is alive. Derived from `user_intent` + `auto_pause`.
     is_playing: bool,
     exit: bool,
+
+    // Auto-pause arbitration (shared by issue #13 and, later, issue #1)
+    user_intent: UserIntent,
+    auto_pause: AutoPause,
+    pause_on_fullscreen: bool,
+    pause_on_maximized: bool,
+    /// Toplevel-info protocol state; `None` if the compositor doesn't expose it,
+    /// in which case fullscreen detection is silently disabled.
+    toplevel_info: Option<ToplevelInfoState>,
 
     // Cross-fade state
     prev_frame: Option<Vec<u8>>,
@@ -183,6 +228,11 @@ pub fn run(
         pipeline: None,
         is_playing: false,
         exit: false,
+        user_intent: UserIntent::Playing,
+        auto_pause: AutoPause::default(),
+        pause_on_fullscreen: true,
+        pause_on_maximized: false,
+        toplevel_info: None,
         prev_frame: None,
         prev_decode_w: 0,
         prev_decode_h: 0,
@@ -198,6 +248,16 @@ pub fn run(
         cached_bb: ((0, 0), (0, 0)),
         bb_dirty: true,
     };
+
+    // Bind the toplevel-info protocol for fullscreen detection (issue #13).
+    // Returns None if the compositor doesn't advertise ext-foreign-toplevel-list,
+    // in which case auto-pause-on-fullscreen silently does nothing.
+    renderer.toplevel_info = ToplevelInfoState::try_new(&renderer.registry_state, &qh);
+    if renderer.toplevel_info.is_some() {
+        tracing::info!("toplevel-info bound; auto-pause-on-fullscreen available");
+    } else {
+        tracing::warn!("toplevel-info unavailable; auto-pause-on-fullscreen disabled");
+    }
 
     tracing::info!("Entering Wayland event loop");
 
@@ -742,6 +802,8 @@ impl WallpaperRenderer {
                 if let Some(p) = self.pipeline.take() {
                     p.stop();
                 }
+                // Selecting a source implies the user wants it playing.
+                self.user_intent = UserIntent::Playing;
                 if self.decode_width == 0 || self.decode_height == 0 {
                     tracing::warn!("Cannot set source before any output is configured");
                     // Store the path so it starts when outputs configure
@@ -761,15 +823,22 @@ impl WallpaperRenderer {
                     self.fps_cap,
                 ) {
                     Ok(pipeline) => {
-                        pipeline.play();
-                        self.is_playing = true;
+                        let desired = self.desired_playing();
+                        if desired {
+                            pipeline.play();
+                        } else {
+                            pipeline.pause();
+                        }
+                        self.is_playing = desired;
                         if let Ok(mut state) = self.daemon_state.lock() {
                             state.source_path = path;
-                            state.playing = true;
+                            state.playing = desired;
                             state.error = None;
                         }
                         self.pipeline = Some(pipeline);
-                        self.request_frame(qh);
+                        if desired {
+                            self.request_frame(qh);
+                        }
                     }
                     Err(e) => {
                         tracing::error!("Failed to create decoder pipeline: {e}");
@@ -780,14 +849,10 @@ impl WallpaperRenderer {
                 }
             }
             Command::Play => {
-                if let Some(p) = &self.pipeline {
-                    // Resume paused pipeline
-                    p.play();
-                    self.is_playing = true;
-                    if let Ok(mut state) = self.daemon_state.lock() {
-                        state.playing = true;
-                    }
-                    self.request_frame(qh);
+                self.user_intent = UserIntent::Playing;
+                if self.pipeline.is_some() {
+                    // Resume existing pipeline (subject to auto-pause reasons)
+                    self.reconcile_playback(qh);
                 } else {
                     // Pipeline was destroyed (Stop) — recreate from saved source
                     let source = self
@@ -802,15 +867,11 @@ impl WallpaperRenderer {
                 }
             }
             Command::Pause => {
-                if let Some(p) = &self.pipeline {
-                    p.pause();
-                    self.is_playing = false;
-                    if let Ok(mut state) = self.daemon_state.lock() {
-                        state.playing = false;
-                    }
-                }
+                self.user_intent = UserIntent::Paused;
+                self.reconcile_playback(qh);
             }
             Command::Stop => {
+                self.user_intent = UserIntent::Stopped;
                 if let Some(p) = self.pipeline.take() {
                     p.stop();
                 }
@@ -848,6 +909,72 @@ impl WallpaperRenderer {
                 }
                 self.recreate_pipeline_if_active();
             }
+            Command::SetPauseOnFullscreen(enabled) => {
+                self.pause_on_fullscreen = enabled;
+                // Recompute against current toplevels (handles enable and disable).
+                self.update_window_pause(qh);
+            }
+            Command::SetPauseOnMaximized(enabled) => {
+                self.pause_on_maximized = enabled;
+                self.update_window_pause(qh);
+            }
+        }
+    }
+
+    // --- Auto-pause arbitration ---
+
+    /// Effective playback: the user wants to play and nothing is auto-pausing.
+    fn desired_playing(&self) -> bool {
+        self.user_intent == UserIntent::Playing && !self.auto_pause.any()
+    }
+
+    /// Drive an existing pipeline + the frame-callback chain to match
+    /// `desired_playing()`. No-op when already in the desired state, so it's
+    /// safe to call on every intent/auto-pause change without doubling the
+    /// frame-callback chain.
+    fn reconcile_playback(&mut self, qh: &QueueHandle<Self>) {
+        let desired = self.desired_playing();
+        if desired == self.is_playing {
+            return;
+        }
+        if let Some(p) = &self.pipeline {
+            if desired {
+                p.play();
+            } else {
+                p.pause();
+            }
+        }
+        self.is_playing = desired;
+        if let Ok(mut state) = self.daemon_state.lock() {
+            state.playing = desired;
+        }
+        if desired {
+            self.request_frame(qh);
+        } else if self.auto_pause.covered {
+            tracing::info!("Auto-paused: a covering window is active");
+        }
+    }
+
+    /// Recompute the "covering window" auto-pause reason from current toplevels
+    /// and reconcile if it changed. Pauses on any fullscreen toplevel, plus any
+    /// maximized toplevel when that option is enabled. Global granularity for
+    /// v1: any matching toplevel on any output pauses playback.
+    fn update_window_pause(&mut self, qh: &QueueHandle<Self>) {
+        let pause_on_fullscreen = self.pause_on_fullscreen;
+        let pause_on_maximized = self.pause_on_maximized;
+        let covered = self
+            .toplevel_info
+            .as_ref()
+            .map(|ti| {
+                ti.toplevels().any(|t| {
+                    (pause_on_fullscreen && t.state.contains(&ToplevelState::Fullscreen))
+                        || (pause_on_maximized && t.state.contains(&ToplevelState::Maximized))
+                })
+            })
+            .unwrap_or(false);
+        if covered != self.auto_pause.covered {
+            self.auto_pause.covered = covered;
+            self.reconcile_playback(qh);
         }
     }
 
@@ -950,8 +1077,10 @@ impl WallpaperRenderer {
             self.fps_cap,
         ) {
             Ok(pipeline) => {
-                if self.is_playing {
+                if self.desired_playing() {
                     pipeline.play();
+                } else {
+                    pipeline.pause();
                 }
                 self.pipeline = Some(pipeline);
             }
@@ -988,13 +1117,20 @@ impl WallpaperRenderer {
             self.fps_cap,
         ) {
             Ok(pipeline) => {
-                pipeline.play();
-                self.is_playing = true;
+                let desired = self.desired_playing();
+                if desired {
+                    pipeline.play();
+                } else {
+                    pipeline.pause();
+                }
+                self.is_playing = desired;
                 if let Ok(mut state) = self.daemon_state.lock() {
-                    state.playing = true;
+                    state.playing = desired;
                 }
                 self.pipeline = Some(pipeline);
-                self.request_frame(qh);
+                if desired {
+                    self.request_frame(qh);
+                }
             }
             Err(e) => tracing::error!("Failed to start deferred pipeline: {e}"),
         }
@@ -1420,12 +1556,50 @@ impl ShmHandler for WallpaperRenderer {
     }
 }
 
+impl ToplevelInfoHandler for WallpaperRenderer {
+    fn toplevel_info_state(&mut self) -> &mut ToplevelInfoState {
+        // Only ever called by the protocol dispatch, which exists only when
+        // `toplevel_info` was successfully bound.
+        self.toplevel_info
+            .as_mut()
+            .expect("toplevel_info dispatched without bound state")
+    }
+
+    fn new_toplevel(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        _toplevel: &ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
+    ) {
+        self.update_window_pause(qh);
+    }
+
+    fn update_toplevel(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        _toplevel: &ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
+    ) {
+        self.update_window_pause(qh);
+    }
+
+    fn toplevel_closed(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        _toplevel: &ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
+    ) {
+        self.update_window_pause(qh);
+    }
+}
+
 delegate_compositor!(WallpaperRenderer);
 delegate_output!(WallpaperRenderer);
 delegate_shm!(WallpaperRenderer);
 delegate_seat!(WallpaperRenderer);
 delegate_layer!(WallpaperRenderer);
 delegate_registry!(WallpaperRenderer);
+delegate_toplevel_info!(WallpaperRenderer);
 
 impl ProvidesRegistryState for WallpaperRenderer {
     fn registry(&mut self) -> &mut RegistryState {

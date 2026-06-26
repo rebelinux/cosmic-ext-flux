@@ -14,8 +14,13 @@ use tracing_subscriber::EnvFilter;
 use wayland::{Command, DaemonState};
 
 fn main() -> Result<()> {
+    // Default to info-level logging so the systemd journal captures daemon
+    // lifecycle events (startup, output config, auto-pause) without needing
+    // RUST_LOG set; RUST_LOG still overrides when present.
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .init();
 
     tracing::info!("Starting cosmic-ext-flux-daemon");
@@ -81,6 +86,13 @@ fn restore_from_config(tx: &std::sync::mpsc::SyncSender<Command>) {
         Some(p) => p,
         None => return,
     };
+
+    // Apply the auto-pause preferences regardless of autostart, so they take
+    // effect even when the user starts playback manually later.
+    let pause_on_fullscreen = read_config_bool(&config_dir, "pause_on_fullscreen").unwrap_or(true);
+    let _ = tx.send(Command::SetPauseOnFullscreen(pause_on_fullscreen));
+    let pause_on_maximized = read_config_bool(&config_dir, "pause_on_maximized").unwrap_or(false);
+    let _ = tx.send(Command::SetPauseOnMaximized(pause_on_maximized));
 
     let autostart = read_config_bool(&config_dir, "autostart").unwrap_or(false);
     if !autostart {
@@ -179,7 +191,7 @@ fn config_home() -> PathBuf {
 fn dirs_config_path() -> Option<PathBuf> {
     let config_home = config_home();
     // Try newest version first, fall back to older
-    for ver in ["v3", "v2", "v1"] {
+    for ver in ["v4", "v3", "v2", "v1"] {
         let dir = config_home.join(format!("cosmic/io.github.franz_net.CosmicExtAppletFlux/{ver}"));
         if dir.is_dir() {
             return Some(dir);
