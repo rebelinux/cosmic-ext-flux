@@ -27,8 +27,9 @@ i18n-embed = { version = "0.16", features = ["fluent-system", "desktop-requester
 i18n-embed-fl = "0.10"
 rust-embed = "8"
 
-ashpd = "0.12.3"
+ashpd = {version = "0.13.12", features = ["file_chooser"] }
 futures-util = "0.3"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2.5.8"

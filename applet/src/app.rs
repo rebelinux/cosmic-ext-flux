@@ -554,8 +554,15 @@ async fn pick_media_file() -> Option<String> {
         .response()
         .ok()?;
 
-    let uri = response.uris().first()?;
-    uri.to_file_path().ok().map(|p| p.to_string_lossy().into_owned())
+    let uri: &ashpd::Uri = response.uris().first()?;
+    
+    // Fix: Parse the string URI into a structured URL object, then convert to Path
+    url::Url::parse(uri.as_str())
+        .ok()?
+        .to_file_path()
+        .ok()?
+        .to_str()
+        .map(|s| s.to_string())
 }
 
 #[derive(Debug, Clone)]
