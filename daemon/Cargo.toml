@@ -21,8 +21,8 @@ wayland-client = "0.31"
 # wayland-client/sctk and there is no version clash with the deps above.
 cosmic-client-toolkit = { git = "https://github.com/pop-os/cosmic-protocols", rev = "d0e95be" }
 
-gstreamer = "0.23"
-gstreamer-app = "0.23"
+gstreamer = "0.25.2"
+gstreamer-app = "0.25.2"
 
 tokio = { version = "1", features = ["rt", "macros", "sync"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }

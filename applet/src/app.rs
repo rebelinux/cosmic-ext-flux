@@ -5,7 +5,7 @@ use crate::fl;
 use ashpd::desktop::file_chooser::{FileFilter, SelectedFiles};
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::{window::Id, Limits, Subscription};
-use cosmic::iced_winit::commands::popup::{destroy_popup, get_popup};
+use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
 use cosmic::prelude::*;
 use cosmic::widget;
 use futures_util::SinkExt;
@@ -178,8 +178,7 @@ impl cosmic::Application for AppModel {
         );
 
         let mut content = widget::list_column()
-            .padding(5)
-            .spacing(0)
+            .divider_padding(10)
             .add(file_row)
             .add(playback_row);
 
@@ -277,23 +276,26 @@ impl cosmic::Application for AppModel {
             self.core()
                 .watch_config::<Config>(APP_ID)
                 .map(|update| Message::UpdateConfig(update.config)),
-            Subscription::run_with_id(
+            Subscription::run_with(
                 std::any::TypeId::of::<DaemonPoll>(),
-                cosmic::iced::stream::channel(4, move |mut sender| async move {
-                    loop {
-                        match poll_daemon_state().await {
-                            Ok((playing, error, cpu, memory, fps, source_fps)) => {
-                                let _ = sender
-                                    .send(Message::DaemonState { playing, error, cpu, memory, fps, source_fps })
-                                    .await;
+
+                |_id| {
+                    cosmic::iced::stream::channel::<Message>(4, move |mut sender: cosmic::iced::futures::channel::mpsc::Sender<Message>| async move {
+                        loop {
+                            match poll_daemon_state().await {
+                                Ok((playing, error, cpu, memory, fps, source_fps)) => {
+                                    let _ = sender
+                                        .send(Message::DaemonState { playing, error, cpu, memory, fps, source_fps })
+                                        .await;
+                                }
+                                Err(_) => {
+                                    let _ = sender.send(Message::DaemonUnavailable).await;
+                                }
                             }
-                            Err(_) => {
-                                let _ = sender.send(Message::DaemonUnavailable).await;
-                            }
+                            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                         }
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                    }
-                }),
+                    })
+                },
             ),
         ])
     }
@@ -326,7 +328,7 @@ impl cosmic::Application for AppModel {
                         // Headroom for the full set of rows; a too-low ceiling
                         // makes the popup overflow and the surface races on
                         // configure (xdg_surface unconfigured_buffer crash).
-                        .max_height(900.0);
+                        .max_height(600.0);
                     get_popup(popup_settings)
                 };
             }
@@ -505,7 +507,7 @@ impl cosmic::Application for AppModel {
         Task::none()
     }
 
-    fn style(&self) -> Option<cosmic::iced_runtime::Appearance> {
+    fn style(&self) -> Option<cosmic::iced::theme::Style> {
         Some(cosmic::applet::style())
     }
 }
