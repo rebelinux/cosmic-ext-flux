@@ -4,6 +4,12 @@
 //! Supports multiple outputs with mirror mode (default) and span mode.
 
 use anyhow::Result;
+use cosmic_client_toolkit::{
+    cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::State as ToplevelState,
+    delegate_toplevel_info,
+    toplevel_info::{ToplevelInfoHandler, ToplevelInfoState},
+    wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1,
+};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState},
     delegate_compositor, delegate_layer, delegate_output, delegate_registry, delegate_seat,
@@ -13,28 +19,22 @@ use smithay_client_toolkit::{
     registry_handlers,
     seat::{Capability, SeatHandler, SeatState},
     shell::{
+        WaylandSurface,
         wlr_layer::{
             Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface,
             LayerSurfaceConfigure,
         },
-        WaylandSurface,
     },
-    shm::{slot::SlotPool, Shm, ShmHandler},
-};
-use cosmic_client_toolkit::{
-    cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::State as ToplevelState,
-    delegate_toplevel_info,
-    toplevel_info::{ToplevelInfoHandler, ToplevelInfoState},
-    wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1,
+    shm::{Shm, ShmHandler, slot::SlotPool},
 };
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
 };
 use wayland_client::{
+    Connection, QueueHandle,
     globals::registry_queue_init,
     protocol::{wl_output, wl_seat, wl_shm, wl_surface},
-    Connection, QueueHandle,
 };
 
 /// Video scaling mode.
@@ -339,11 +339,17 @@ fn blit_scaled(
         dst.fill(0);
         return;
     }
-    let Some(expected_src) = (src_w as usize).checked_mul(src_h as usize).and_then(|n| n.checked_mul(4)) else {
+    let Some(expected_src) = (src_w as usize)
+        .checked_mul(src_h as usize)
+        .and_then(|n| n.checked_mul(4))
+    else {
         dst.fill(0);
         return;
     };
-    let Some(expected_dst) = (dst_w as usize).checked_mul(dst_h as usize).and_then(|n| n.checked_mul(4)) else {
+    let Some(expected_dst) = (dst_w as usize)
+        .checked_mul(dst_h as usize)
+        .and_then(|n| n.checked_mul(4))
+    else {
         dst.fill(0);
         return;
     };
@@ -391,14 +397,7 @@ fn copy_row_lut(src: &[u8], src_row: usize, dst: &mut [u8], dst_row: usize, x_lu
 }
 
 /// Stretch: scale ignoring aspect ratio.
-fn blit_stretch(
-    src: &[u8],
-    src_w: u32,
-    src_h: u32,
-    dst: &mut [u8],
-    dst_w: u32,
-    dst_h: u32,
-) {
+fn blit_stretch(src: &[u8], src_w: u32, src_h: u32, dst: &mut [u8], dst_w: u32, dst_h: u32) {
     if src_w == dst_w && src_h == dst_h {
         let n = (dst_w as usize) * (dst_h as usize) * 4;
         dst[..n].copy_from_slice(&src[..n]);
@@ -414,14 +413,7 @@ fn blit_stretch(
 }
 
 /// Fit (letterbox): scale preserving aspect ratio, black bars on sides.
-fn blit_fit(
-    src: &[u8],
-    src_w: u32,
-    src_h: u32,
-    dst: &mut [u8],
-    dst_w: u32,
-    dst_h: u32,
-) {
+fn blit_fit(src: &[u8], src_w: u32, src_h: u32, dst: &mut [u8], dst_w: u32, dst_h: u32) {
     let expected_dst = (dst_w as usize) * (dst_h as usize) * 4;
     dst[..expected_dst].fill(0); // black background
 
@@ -429,9 +421,15 @@ fn blit_fit(
     let dst_aspect = dst_w as f64 / dst_h as f64;
 
     let (render_w, render_h) = if src_aspect > dst_aspect {
-        (dst_w, ((dst_w as f64 / src_aspect) as u32).max(1).min(dst_h))
+        (
+            dst_w,
+            ((dst_w as f64 / src_aspect) as u32).max(1).min(dst_h),
+        )
     } else {
-        (((dst_h as f64 * src_aspect) as u32).max(1).min(dst_w), dst_h)
+        (
+            ((dst_h as f64 * src_aspect) as u32).max(1).min(dst_w),
+            dst_h,
+        )
     };
 
     let offset_x = (dst_w - render_w) / 2;
@@ -449,14 +447,7 @@ fn blit_fit(
 }
 
 /// Zoom (crop to fill): scale preserving aspect ratio, crop overflow.
-fn blit_zoom(
-    src: &[u8],
-    src_w: u32,
-    src_h: u32,
-    dst: &mut [u8],
-    dst_w: u32,
-    dst_h: u32,
-) {
+fn blit_zoom(src: &[u8], src_w: u32, src_h: u32, dst: &mut [u8], dst_w: u32, dst_h: u32) {
     let src_aspect = src_w as f64 / src_h as f64;
     let dst_aspect = dst_w as f64 / dst_h as f64;
 
@@ -571,18 +562,17 @@ fn draw_single_output(
     }
     let stride = dst_w as i32 * 4;
 
-    let (buffer, canvas) = match os.pool.create_buffer(
-        dst_w as i32,
-        dst_h as i32,
-        stride,
-        wl_shm::Format::Argb8888,
-    ) {
-        Ok(pair) => pair,
-        Err(e) => {
-            tracing::error!("Failed to create SHM buffer: {e}");
-            return;
-        }
-    };
+    let (buffer, canvas) =
+        match os
+            .pool
+            .create_buffer(dst_w as i32, dst_h as i32, stride, wl_shm::Format::Argb8888)
+        {
+            Ok(pair) => pair,
+            Err(e) => {
+                tracing::error!("Failed to create SHM buffer: {e}");
+                return;
+            }
+        };
 
     match frame {
         Some(frame) if src_w > 0 && src_h > 0 => {
@@ -684,15 +674,38 @@ impl WallpaperRenderer {
                     } else {
                         let expected = (src_w as usize) * (src_h as usize) * 4;
                         self.scaled_prev_buffer.resize(expected, 0);
-                        blit_stretch(prev, self.prev_decode_w, self.prev_decode_h, &mut self.scaled_prev_buffer, src_w, src_h);
-                        blend_frames(&self.scaled_prev_buffer, new_frame, &mut self.blend_buffer, alpha);
+                        blit_stretch(
+                            prev,
+                            self.prev_decode_w,
+                            self.prev_decode_h,
+                            &mut self.scaled_prev_buffer,
+                            src_w,
+                            src_h,
+                        );
+                        blend_frames(
+                            &self.scaled_prev_buffer,
+                            new_frame,
+                            &mut self.blend_buffer,
+                            alpha,
+                        );
                     }
                 } else {
                     self.blend_buffer.clear();
                     self.blend_buffer.extend_from_slice(prev);
                 }
                 for os in &mut self.outputs {
-                    draw_single_output(os, Some(&self.blend_buffer), src_w, src_h, span, playing, fit_mode, bb_origin, bb_size, qh);
+                    draw_single_output(
+                        os,
+                        Some(&self.blend_buffer),
+                        src_w,
+                        src_h,
+                        span,
+                        playing,
+                        fit_mode,
+                        bb_origin,
+                        bb_size,
+                        qh,
+                    );
                 }
                 // Put the frame back so GStreamer can reuse the allocation
                 if let Some(frame) = frame_data {
@@ -715,7 +728,18 @@ impl WallpaperRenderer {
         }
 
         for os in &mut self.outputs {
-            draw_single_output(os, frame_data.as_deref(), src_w, src_h, span, playing, fit_mode, bb_origin, bb_size, qh);
+            draw_single_output(
+                os,
+                frame_data.as_deref(),
+                src_w,
+                src_h,
+                span,
+                playing,
+                fit_mode,
+                bb_origin,
+                bb_size,
+                qh,
+            );
         }
 
         // Put the buffer back so GStreamer can reuse the allocation
@@ -726,11 +750,7 @@ impl WallpaperRenderer {
         }
     }
 
-    fn draw_output_by_surface(
-        &mut self,
-        surface: &wl_surface::WlSurface,
-        qh: &QueueHandle<Self>,
-    ) {
+    fn draw_output_by_surface(&mut self, surface: &wl_surface::WlSurface, qh: &QueueHandle<Self>) {
         let src_w = self.decode_width;
         let src_h = self.decode_height;
         let span = self.span_mode;
@@ -753,15 +773,42 @@ impl WallpaperRenderer {
                     } else {
                         let expected = (src_w as usize) * (src_h as usize) * 4;
                         self.scaled_prev_buffer.resize(expected, 0);
-                        blit_stretch(prev, self.prev_decode_w, self.prev_decode_h, &mut self.scaled_prev_buffer, src_w, src_h);
-                        blend_frames(&self.scaled_prev_buffer, new_frame, &mut self.blend_buffer, alpha);
+                        blit_stretch(
+                            prev,
+                            self.prev_decode_w,
+                            self.prev_decode_h,
+                            &mut self.scaled_prev_buffer,
+                            src_w,
+                            src_h,
+                        );
+                        blend_frames(
+                            &self.scaled_prev_buffer,
+                            new_frame,
+                            &mut self.blend_buffer,
+                            alpha,
+                        );
                     }
                 } else {
                     self.blend_buffer.clear();
                     self.blend_buffer.extend_from_slice(prev);
                 }
-                if let Some(os) = self.outputs.iter_mut().find(|o| o.layer.wl_surface() == surface) {
-                    draw_single_output(os, Some(&self.blend_buffer), src_w, src_h, span, playing, fit_mode, bb_origin, bb_size, qh);
+                if let Some(os) = self
+                    .outputs
+                    .iter_mut()
+                    .find(|o| o.layer.wl_surface() == surface)
+                {
+                    draw_single_output(
+                        os,
+                        Some(&self.blend_buffer),
+                        src_w,
+                        src_h,
+                        span,
+                        playing,
+                        fit_mode,
+                        bb_origin,
+                        bb_size,
+                        qh,
+                    );
                 }
                 if let Some(frame) = frame_data {
                     if let Ok(mut fb) = self.frame_buffer.lock() {
@@ -775,8 +822,23 @@ impl WallpaperRenderer {
         // Swap frame out quickly to minimize lock contention
         let frame_data = self.frame_buffer.lock().ok().and_then(|mut f| f.take());
 
-        if let Some(os) = self.outputs.iter_mut().find(|o| o.layer.wl_surface() == surface) {
-            draw_single_output(os, frame_data.as_deref(), src_w, src_h, span, playing, fit_mode, bb_origin, bb_size, qh);
+        if let Some(os) = self
+            .outputs
+            .iter_mut()
+            .find(|o| o.layer.wl_surface() == surface)
+        {
+            draw_single_output(
+                os,
+                frame_data.as_deref(),
+                src_w,
+                src_h,
+                span,
+                playing,
+                fit_mode,
+                bb_origin,
+                bb_size,
+                qh,
+            );
         }
 
         if let Some(frame) = frame_data {
@@ -1265,7 +1327,11 @@ fn save_frame_cache(frame: &[u8], width: u32, height: u32) {
         return;
     }
     // Verify the cache directory is not a symlink
-    if cache_dir.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(true) {
+    if cache_dir
+        .symlink_metadata()
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(true)
+    {
         tracing::warn!("Cache directory is a symlink, refusing to write");
         return;
     }
@@ -1300,7 +1366,9 @@ pub fn load_frame_cache() -> Option<(Vec<u8>, u32, u32)> {
     if width == 0 || height == 0 || width > MAX_CACHE_DIM || height > MAX_CACHE_DIM {
         return None;
     }
-    let expected = (width as usize).checked_mul(height as usize)?.checked_mul(4)?;
+    let expected = (width as usize)
+        .checked_mul(height as usize)?
+        .checked_mul(4)?;
     if data.len() < 8 + expected {
         return None;
     }
@@ -1458,10 +1526,7 @@ impl OutputHandler for WallpaperRenderer {
             .as_ref()
             .and_then(|i| i.logical_position)
             .unwrap_or((0, 0));
-        let logical_sz = info
-            .as_ref()
-            .and_then(|i| i.logical_size)
-            .unwrap_or((0, 0));
+        let logical_sz = info.as_ref().and_then(|i| i.logical_size).unwrap_or((0, 0));
 
         self.outputs.push(OutputSurface {
             output,

@@ -4,8 +4,8 @@ use crate::config::Config;
 use crate::fl;
 use ashpd::desktop::file_chooser::{FileFilter, SelectedFiles};
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
-use cosmic::iced::{window::Id, Limits, Subscription};
 use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
+use cosmic::iced::{Limits, Subscription, window::Id};
 use cosmic::prelude::*;
 use cosmic::widget;
 use futures_util::SinkExt;
@@ -29,7 +29,14 @@ pub enum Message {
     SetPauseOnMaximized(bool),
     SetPauseOnBattery(bool),
     UpdateConfig(Config),
-    DaemonState { playing: bool, error: Option<String>, cpu: f64, memory: f64, fps: f64, source_fps: f64 },
+    DaemonState {
+        playing: bool,
+        error: Option<String>,
+        cpu: f64,
+        memory: f64,
+        fps: f64,
+        source_fps: f64,
+    },
     CommandSent,
     DaemonUnavailable,
     StartDaemon,
@@ -93,11 +100,7 @@ impl cosmic::Application for AppModel {
             core,
             config,
             daemon_available: true,
-            fit_options: vec![
-                fl!("fit-zoom"),
-                fl!("fit-fit"),
-                fl!("fit-stretch"),
-            ],
+            fit_options: vec![fl!("fit-zoom"), fl!("fit-fit"), fl!("fit-stretch")],
             ..Default::default()
         };
 
@@ -200,7 +203,13 @@ impl cosmic::Application for AppModel {
         if !fps_auto {
             let fps_label = if self.source_fps > 0.0 {
                 let recommended = ((self.source_fps / 3.0).round() as u32).clamp(5, 15);
-                format!("{} ({}) · src: {:.0}fps, rec: {}", fl!("fps-cap"), self.config.fps_cap, self.source_fps, recommended)
+                format!(
+                    "{} ({}) · src: {:.0}fps, rec: {}",
+                    fl!("fps-cap"),
+                    self.config.fps_cap,
+                    self.source_fps,
+                    recommended
+                )
             } else {
                 format!("{} ({})", fl!("fps-cap"), self.config.fps_cap)
             };
@@ -217,8 +226,7 @@ impl cosmic::Application for AppModel {
         // Span mode toggle
         let span_row = widget::settings::item(
             fl!("span-mode"),
-            widget::toggler(self.config.span_mode)
-                .on_toggle(Message::SetSpanMode),
+            widget::toggler(self.config.span_mode).on_toggle(Message::SetSpanMode),
         );
         content = content.add(span_row);
 
@@ -233,16 +241,14 @@ impl cosmic::Application for AppModel {
         // Optionally also pause on maximized windows (opt-in)
         let maximized_row = widget::settings::item(
             fl!("pause-on-maximized"),
-            widget::toggler(self.config.pause_on_maximized)
-                .on_toggle(Message::SetPauseOnMaximized),
+            widget::toggler(self.config.pause_on_maximized).on_toggle(Message::SetPauseOnMaximized),
         );
         content = content.add(maximized_row);
 
         // Pause on battery power (opt-in, issue #1)
         let battery_row = widget::settings::item(
             fl!("pause-on-battery"),
-            widget::toggler(self.config.pause_on_battery)
-                .on_toggle(Message::SetPauseOnBattery),
+            widget::toggler(self.config.pause_on_battery).on_toggle(Message::SetPauseOnBattery),
         );
         content = content.add(battery_row);
 
@@ -276,16 +282,22 @@ impl cosmic::Application for AppModel {
             self.core()
                 .watch_config::<Config>(APP_ID)
                 .map(|update| Message::UpdateConfig(update.config)),
-            Subscription::run_with(
-                std::any::TypeId::of::<DaemonPoll>(),
-
-                |_id| {
-                    cosmic::iced::stream::channel::<Message>(4, move |mut sender: cosmic::iced::futures::channel::mpsc::Sender<Message>| async move {
+            Subscription::run_with(std::any::TypeId::of::<DaemonPoll>(), |_id| {
+                cosmic::iced::stream::channel::<Message>(
+                    4,
+                    move |mut sender: cosmic::iced::futures::channel::mpsc::Sender<Message>| async move {
                         loop {
                             match poll_daemon_state().await {
                                 Ok((playing, error, cpu, memory, fps, source_fps)) => {
                                     let _ = sender
-                                        .send(Message::DaemonState { playing, error, cpu, memory, fps, source_fps })
+                                        .send(Message::DaemonState {
+                                            playing,
+                                            error,
+                                            cpu,
+                                            memory,
+                                            fps,
+                                            source_fps,
+                                        })
                                         .await;
                                 }
                                 Err(_) => {
@@ -294,9 +306,9 @@ impl cosmic::Application for AppModel {
                             }
                             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                         }
-                    })
-                },
-            ),
+                    },
+                )
+            }),
         ])
     }
 
@@ -314,13 +326,10 @@ impl cosmic::Application for AppModel {
                     let new_id = Id::unique();
                     tracing::debug!("TogglePopup: creating popup {new_id:?}");
                     self.popup.replace(new_id);
-                    let mut popup_settings = self.core.applet.get_popup_settings(
-                        main_id,
-                        new_id,
-                        None,
-                        None,
-                        None,
-                    );
+                    let mut popup_settings = self
+                        .core
+                        .applet
+                        .get_popup_settings(main_id, new_id, None, None, None);
                     popup_settings.positioner.size_limits = Limits::NONE
                         .max_width(372.0)
                         .min_width(300.0)
@@ -342,7 +351,14 @@ impl cosmic::Application for AppModel {
                 config.fps_cap = normalize_fps_cap(config.fps_cap);
                 self.config = config;
             }
-            Message::DaemonState { playing, error, cpu, memory, fps, source_fps } => {
+            Message::DaemonState {
+                playing,
+                error,
+                cpu,
+                memory,
+                fps,
+                source_fps,
+            } => {
                 // A change in `playing`/`available` adds or removes popup rows
                 // (stats / start-daemon), which resizes an open popup — log it
                 // so a crash can be correlated with a content-height change.
@@ -358,7 +374,10 @@ impl cosmic::Application for AppModel {
                 self.daemon_playing = playing;
                 self.daemon_error = error.map(|e| {
                     if e.len() > 256 {
-                        e.char_indices().take_while(|&(i, _)| i < 256).map(|(_, c)| c).collect()
+                        e.char_indices()
+                            .take_while(|&(i, _)| i < 256)
+                            .map(|(_, c)| c)
+                            .collect()
                     } else {
                         e
                     }
@@ -440,27 +459,24 @@ impl cosmic::Application for AppModel {
             Message::SetFitMode(mode) => {
                 self.config.fit_mode = mode.clone();
                 self.save_config();
-                return Task::perform(
-                    send_command(DaemonCommand::SetFitMode(mode)),
-                    |_| cosmic::Action::App(Message::CommandSent),
-                );
+                return Task::perform(send_command(DaemonCommand::SetFitMode(mode)), |_| {
+                    cosmic::Action::App(Message::CommandSent)
+                });
             }
             Message::SetSpanMode(enabled) => {
                 self.config.span_mode = enabled;
                 self.save_config();
-                return Task::perform(
-                    send_command(DaemonCommand::SetSpanMode(enabled)),
-                    |_| cosmic::Action::App(Message::CommandSent),
-                );
+                return Task::perform(send_command(DaemonCommand::SetSpanMode(enabled)), |_| {
+                    cosmic::Action::App(Message::CommandSent)
+                });
             }
             Message::SetFpsCap(fps) => {
                 let fps = fps.clamp(5, 60);
                 self.config.fps_cap = fps;
                 self.save_config();
-                return Task::perform(
-                    send_command(DaemonCommand::SetFpsCap(fps)),
-                    |_| cosmic::Action::App(Message::CommandSent),
-                );
+                return Task::perform(send_command(DaemonCommand::SetFpsCap(fps)), |_| {
+                    cosmic::Action::App(Message::CommandSent)
+                });
             }
             Message::SetFpsAuto(enabled) => {
                 // Auto = 0 (follow source). Turning auto off seeds the slider
@@ -474,10 +490,9 @@ impl cosmic::Application for AppModel {
                 };
                 self.config.fps_cap = fps;
                 self.save_config();
-                return Task::perform(
-                    send_command(DaemonCommand::SetFpsCap(fps)),
-                    |_| cosmic::Action::App(Message::CommandSent),
-                );
+                return Task::perform(send_command(DaemonCommand::SetFpsCap(fps)), |_| {
+                    cosmic::Action::App(Message::CommandSent)
+                });
             }
             Message::SetPauseOnFullscreen(enabled) => {
                 self.config.pause_on_fullscreen = enabled;
@@ -524,11 +539,7 @@ impl AppModel {
 
 /// 0 means follow the source framerate; anything else is clamped to 5–60.
 fn normalize_fps_cap(fps: u32) -> u32 {
-    if fps == 0 {
-        0
-    } else {
-        fps.clamp(5, 60)
-    }
+    if fps == 0 { 0 } else { fps.clamp(5, 60) }
 }
 
 // --- Async helpers ---
@@ -555,14 +566,14 @@ async fn pick_media_file() -> Option<String> {
         .ok()?;
 
     let uri: &ashpd::Uri = response.uris().first()?;
-    
+
     // Fix: Parse the string URI into a structured URL object, then convert to Path
     url::Url::parse(uri.as_str())
         .ok()?
         .to_file_path()
         .ok()?
         .to_str()
-        .map(|s| s.to_string())
+        .map(|s: &str| s.to_string())
 }
 
 #[derive(Debug, Clone)]

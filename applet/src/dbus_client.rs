@@ -68,7 +68,7 @@ pub async fn connect() -> anyhow::Result<WallpaperDaemonProxy<'static>> {
 
 /// Clear the cached proxy so the next `connect()` call creates a fresh connection.
 pub async fn clear_cache() {
-    let mtx = PROXY.get_or_init(|| Mutex::new(None));
+    let mtx: &Mutex<Option<WallpaperDaemonProxy<'static>>> = PROXY.get_or_init(|| Mutex::new(None));
     let mut guard = mtx.lock().await;
     *guard = None;
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use cosmic::cosmic_config;
-use cosmic::cosmic_config::{cosmic_config_derive::CosmicConfigEntry, CosmicConfigEntry};
+use cosmic::cosmic_config::{CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};
 
 #[derive(Debug, Clone, PartialEq, CosmicConfigEntry)]
 #[version = 5]
@@ -23,10 +23,10 @@ impl Default for Config {
             fit_mode: String::new(),
             autostart: false,
             span_mode: false,
-            fps_cap: 0, // 0 = follow source framerate
+            fps_cap: 0,                // 0 = follow source framerate
             pause_on_fullscreen: true, // pause when an app is fullscreen (issue #13)
             pause_on_maximized: false, // also pause when an app is maximized (opt-in)
-            pause_on_battery: false, // pause on battery power (opt-in, issue #1)
+            pause_on_battery: false,   // pause on battery power (opt-in, issue #1)
         }
     }
 }

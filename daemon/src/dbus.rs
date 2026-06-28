@@ -6,15 +6,14 @@
 use crate::wayland::{Command, DaemonState};
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
-use zbus::{interface, Connection};
+use zbus::{Connection, interface};
 
 /// Directories blocked from being used as wallpaper sources.
 const BLOCKED_PREFIXES: &[&str] = &["/dev/", "/proc/", "/sys/", "/run/"];
 
 /// Validate and canonicalize a source path. Returns the canonical path string or an error.
 pub fn validate_source_path(path: &str) -> Result<String, String> {
-    let canonical = std::fs::canonicalize(path)
-        .map_err(|e| format!("Invalid path: {e}"))?;
+    let canonical = std::fs::canonicalize(path).map_err(|e| format!("Invalid path: {e}"))?;
     let canonical_str = canonical
         .to_str()
         .ok_or_else(|| "Path is not valid UTF-8".to_string())?;
@@ -23,8 +22,7 @@ pub fn validate_source_path(path: &str) -> Result<String, String> {
             return Err(format!("Path under {prefix} is not allowed"));
         }
     }
-    let meta = std::fs::metadata(&canonical)
-        .map_err(|e| format!("Cannot access file: {e}"))?;
+    let meta = std::fs::metadata(&canonical).map_err(|e| format!("Cannot access file: {e}"))?;
     if !meta.is_file() {
         return Err("Path is not a regular file".to_string());
     }
@@ -39,8 +37,8 @@ struct WallpaperInterface {
 #[interface(name = "io.github.franz_net.CosmicExtFlux1")]
 impl WallpaperInterface {
     async fn set_source(&self, path: String) -> zbus::fdo::Result<()> {
-        let validated = validate_source_path(&path)
-            .map_err(|e| zbus::fdo::Error::InvalidArgs(e))?;
+        let validated =
+            validate_source_path(&path).map_err(|e| zbus::fdo::Error::InvalidArgs(e))?;
         self.command_tx
             .try_send(Command::SetSource(validated))
             .map_err(|_| zbus::fdo::Error::Failed("Command queue full".to_string()))
@@ -116,7 +114,6 @@ impl WallpaperInterface {
             .map_err(|_| zbus::fdo::Error::Failed("Command queue full".to_string()))
     }
 
-
     /// Returns all daemon state in a single D-Bus call: (playing, error, cpu, memory, fps, source_fps).
     async fn get_state(&self) -> (bool, String, f64, f64, f64, f64) {
         let s = self.state.lock().ok();
@@ -124,7 +121,11 @@ impl WallpaperInterface {
         let error = s.as_ref().and_then(|s| s.error.clone()).unwrap_or_default();
         // Truncate error for D-Bus
         let error = if error.len() > 256 {
-            error.char_indices().take_while(|&(i, _)| i < 256).map(|(_, c)| c).collect()
+            error
+                .char_indices()
+                .take_while(|&(i, _)| i < 256)
+                .map(|(_, c)| c)
+                .collect()
         } else {
             error
         };
@@ -147,12 +148,18 @@ impl WallpaperInterface {
 
     #[zbus(property)]
     async fn source(&self) -> String {
-        self.state.lock().map(|s| s.source_path.clone()).unwrap_or_default()
+        self.state
+            .lock()
+            .map(|s| s.source_path.clone())
+            .unwrap_or_default()
     }
 
     #[zbus(property)]
     async fn fit_mode(&self) -> String {
-        self.state.lock().map(|s| s.fit_mode.as_str().to_string()).unwrap_or_default()
+        self.state
+            .lock()
+            .map(|s| s.fit_mode.as_str().to_string())
+            .unwrap_or_default()
     }
 
     #[zbus(property)]
@@ -176,7 +183,10 @@ impl WallpaperInterface {
 
     #[zbus(property)]
     async fn cpu_percent(&self) -> f64 {
-        self.state.lock().map(|s| s.cpu_percent as f64).unwrap_or(0.0)
+        self.state
+            .lock()
+            .map(|s| s.cpu_percent as f64)
+            .unwrap_or(0.0)
     }
 
     #[zbus(property)]
@@ -196,7 +206,10 @@ impl WallpaperInterface {
 
     #[zbus(property)]
     async fn source_fps(&self) -> f64 {
-        self.state.lock().map(|s| s.source_fps as f64).unwrap_or(0.0)
+        self.state
+            .lock()
+            .map(|s| s.source_fps as f64)
+            .unwrap_or(0.0)
     }
 }
 
@@ -245,7 +258,10 @@ mod tests {
         let res = validate_source_path(dir.to_str().unwrap());
         std::fs::remove_dir_all(&dir).ok();
         let err = res.unwrap_err();
-        assert!(err.contains("not a regular file"), "unexpected error: {err}");
+        assert!(
+            err.contains("not a regular file"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

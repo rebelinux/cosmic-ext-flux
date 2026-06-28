@@ -2,13 +2,13 @@
 
 //! GStreamer pipeline for decoding GIF/video files into BGRA frame data.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use gstreamer as gst;
 use gstreamer::prelude::*;
 use gstreamer_app as gst_app;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
 };
 
 pub struct DecoderPipeline {
@@ -126,8 +126,16 @@ impl DecoderPipeline {
         // Link static chains
         gst::Element::link_many([&filesrc, &decodebin])
             .map_err(|e| anyhow!("Failed to link filesrc→decodebin: {e}"))?;
-        gst::Element::link_many([&videorate, &rate_caps, &videoscale, &scale_caps, &videoconvert, &format_caps, appsink.upcast_ref()])
-            .map_err(|e| anyhow!("Failed to link video chain: {e}"))?;
+        gst::Element::link_many([
+            &videorate,
+            &rate_caps,
+            &videoscale,
+            &scale_caps,
+            &videoconvert,
+            &format_caps,
+            appsink.upcast_ref(),
+        ])
+        .map_err(|e| anyhow!("Failed to link video chain: {e}"))?;
 
         // Handle decodebin's dynamic pads — link video pads only, ignore audio
         let video_sink_pad = videorate

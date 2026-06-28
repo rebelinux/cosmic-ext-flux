@@ -7,10 +7,7 @@ mod wayland;
 
 use anyhow::Result;
 use std::path::{Path, PathBuf};
-use std::sync::{
-    atomic::AtomicBool,
-    Arc, Mutex,
-};
+use std::sync::{Arc, Mutex, atomic::AtomicBool};
 use tracing_subscriber::EnvFilter;
 use wayland::{Command, DaemonState};
 
@@ -201,7 +198,9 @@ fn dirs_config_path() -> Option<PathBuf> {
     let config_home = config_home();
     // Try newest version first, fall back to older
     for ver in ["v5", "v4", "v3", "v2", "v1"] {
-        let dir = config_home.join(format!("cosmic/io.github.franz_net.CosmicExtAppletFlux/{ver}"));
+        let dir = config_home.join(format!(
+            "cosmic/io.github.franz_net.CosmicExtAppletFlux/{ver}"
+        ));
         if dir.is_dir() {
             return Some(dir);
         }

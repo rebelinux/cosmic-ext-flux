@@ -23,11 +23,14 @@ libcosmic = { git = "https://github.com/pop-os/libcosmic.git", default-features 
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 
-i18n-embed = { version = "0.16", features = ["fluent-system", "desktop-requester"] }
+i18n-embed = { version = "0.16", features = [
+    "fluent-system",
+    "desktop-requester",
+] }
 i18n-embed-fl = "0.10"
 rust-embed = "8"
 
-ashpd = {version = "0.13.12", features = ["file_chooser"] }
+ashpd = { version = "0.13.12", features = ["file_chooser"] }
 futures-util = "0.3"
 anyhow = "1"
 tracing = "0.1"
